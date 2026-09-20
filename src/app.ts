@@ -225,12 +225,14 @@ async function editPage(slug: string | null): Promise<void> {
 
   let content = "";
   let sha: string | null = null;
+  let exists = false;
 
   if (slug) {
     try {
       const page = await loadPage(slug);
       content = page.content;
       sha = page.sha;
+      exists = true;
     } catch (error) {
       if (!(error instanceof GitHubError && error.status === 404)) {
         showMessage(describeError(error), "error");
@@ -245,7 +247,7 @@ async function editPage(slug: string | null): Promise<void> {
   let slugInput: HTMLInputElement | null = null;
   if (slug) {
     const heading = document.createElement("h2");
-    heading.textContent = sha ? `Editing: ${titleize(slug)}` : `Creating: ${titleize(slug)}`;
+    heading.textContent = exists ? `Editing: ${titleize(slug)}` : `Creating: ${titleize(slug)}`;
     editor.append(heading);
   } else {
     slugInput = document.createElement("input");
@@ -253,6 +255,12 @@ async function editPage(slug: string | null): Promise<void> {
     slugInput.placeholder = "Page name (e.g. Project Notes)";
     editor.append(slugInput);
   }
+
+  // Controls sit above the text box: below it they fall past the fold on a
+  // phone, where the tall textarea pushes them off screen entirely.
+  const toolbar = document.createElement("div");
+  toolbar.className = "editor-toolbar";
+  editor.append(toolbar);
 
   const textarea = document.createElement("textarea");
   textarea.value = content;
@@ -287,8 +295,14 @@ async function editPage(slug: string | null): Promise<void> {
     imageInput.value = "";
   });
 
-  const imageBtn = button("Add image");
+  const imageBtn = button("Add image", "primary");
   imageBtn.addEventListener("click", () => imageInput.click());
+
+  const toolbarHint = document.createElement("span");
+  toolbarHint.className = "muted toolbar-hint";
+  toolbarHint.textContent = "or drop / paste a photo into the box below";
+
+  toolbar.append(imageBtn, toolbarHint);
   editor.append(imageInput);
 
   textarea.addEventListener("dragover", (event) => {
@@ -324,7 +338,7 @@ async function editPage(slug: string | null): Promise<void> {
   actions.className = "editor-actions";
   const saveBtn = button("Save", "primary");
   const cancelBtn = button("Cancel");
-  actions.append(saveBtn, imageBtn, cancelBtn);
+  actions.append(saveBtn, cancelBtn);
   editor.append(actions, status);
 
   cancelBtn.addEventListener("click", () => {

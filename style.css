@@ -555,3 +555,21 @@ textarea.is-dropping {
   border-color: var(--neon);
   box-shadow: 0 0 12px var(--neon);
 }
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+
+.toolbar-hint {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 640px) {
+  .editor textarea { min-height: 38vh; }
+  .toolbar-hint { display: none; }
+}
