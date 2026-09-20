@@ -30,14 +30,21 @@ const QENET: Record<QenetName, number[]> = {
 
 export const QENET_NAMES = Object.keys(QENET) as QenetName[];
 
-/** Drawbar-style partials: harmonic number paired with its share of the level. */
-const PARTIALS: [number, number][] = [
+/**
+ * Drawbar-style partials: harmonic number paired with its share of the level.
+ * The shares are normalised so the stack sums to one, otherwise the partials
+ * add up and the real output bears no relation to the level asked for.
+ */
+const RAW_PARTIALS: [number, number][] = [
   [1, 1],
   [2, 0.5],
   [3, 0.32],
   [4, 0.18],
   [6, 0.08],
 ];
+
+const PARTIAL_SUM = RAW_PARTIALS.reduce((total, [, share]) => total + share, 0);
+const PARTIALS: [number, number][] = RAW_PARTIALS.map(([h, share]) => [h, share / PARTIAL_SUM]);
 
 const TONIC_HZ = 146.83; // D3, comfortable for an organ register
 
@@ -85,8 +92,27 @@ function degreeToHz(degree: number): number {
  * Starts the audio graph. Must be called from a user gesture, which is both a
  * browser requirement and the only polite way to begin making noise.
  */
+/**
+ * iOS mutes Web Audio when the ringer switch is silent, but not media playback.
+ * Starting a silent looping element moves the page onto the media channel so
+ * the switch no longer silences it.
+ */
+function unlockMediaChannel(): void {
+  const el = document.createElement("audio");
+  el.setAttribute("playsinline", "");
+  el.loop = true;
+  el.volume = 0.001;
+  // One frame of silent WAV.
+  el.src =
+    "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+  void el.play().catch(() => {
+    /* blocked without a gesture; sound still works where the switch is off */
+  });
+}
+
 export async function enable(): Promise<void> {
   wanted = true;
+  unlockMediaChannel();
   if (context) {
     await context.resume();
     return;
@@ -97,7 +123,7 @@ export async function enable(): Promise<void> {
 
   master = created.createGain();
   master.gain.value = 0.0001;
-  master.gain.linearRampToValueAtTime(0.22, created.currentTime + 1.2);
+  master.gain.linearRampToValueAtTime(0.75, created.currentTime + 1.2);
 
   // A long, soft delay stands in for room reverb without a convolution buffer.
   const delay = created.createDelay(1.5);
@@ -154,7 +180,7 @@ function startDrone(): void {
   const ctx = context;
   const bus = ctx.createGain();
   bus.gain.value = 0.0001;
-  bus.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 3);
+  bus.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 3);
 
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
@@ -242,7 +268,7 @@ export function playNote({ degree, duration = 1.6, level = 0.5 }: NoteOptions): 
   tone.connect(voice);
   voice.connect(master);
 
-  const peak = 0.16 * level;
+  const peak = 0.5 * level;
   voice.gain.linearRampToValueAtTime(peak, now + 0.04);
   voice.gain.exponentialRampToValueAtTime(peak * 0.55, now + 0.35);
   voice.gain.exponentialRampToValueAtTime(0.0001, now + duration);
