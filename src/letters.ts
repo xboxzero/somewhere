@@ -13,6 +13,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
+import { TEMPERATURE_EVENT } from "./temperature.js";
 
 /**
  * Renders text as a volumetric cloud of particles: the glyphs are rasterised to
@@ -23,6 +24,20 @@ import {
 
 const NEON = new Color("#00f0ff");
 const HOT = new Color("#ff2bd6");
+
+/** Re-read on each build so the glyphs match the current colour temperature. */
+function accents(): { neon: Color; hot: Color } {
+  const style = getComputedStyle(document.documentElement);
+  const read = (name: string, fallback: Color): Color => {
+    const value = style.getPropertyValue(name).trim();
+    try {
+      return value ? new Color(value) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  return { neon: read("--neon", NEON), hot: read("--hot", HOT) };
+}
 
 /** Depth slices emitted per sampled pixel; more slices read as thicker letters. */
 const LAYERS = [-1.6, -0.8, 0, 0.8, 1.6];
@@ -124,8 +139,11 @@ export function mountLetterField(container: HTMLElement, initialText: string): L
   let count = 0;
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let lastText = initialText;
 
   function setText(text: string): void {
+    lastText = text;
+    const palette = accents();
     const { samples, minX, maxX, minY, maxY } = sampleGlyphs(text.toUpperCase(), 1900);
     count = samples.length * LAYERS.length;
 
@@ -160,9 +178,9 @@ export function mountLetterField(container: HTMLElement, initialText: string): L
         current[index + 1] = y + (Math.random() - 0.5) * 60;
         current[index + 2] = (Math.random() - 0.5) * 70;
 
-        // Edge layers run hotter, which gives the slab a magenta rim.
+        // Edge layers run toward the counter temperature, giving the slab a rim.
         const edge = Math.abs(layer) / 1.6;
-        const color = NEON.clone().lerp(HOT, edge * 0.55);
+        const color = palette.neon.clone().lerp(palette.hot, edge * 0.55);
         colors[index] = color.r;
         colors[index + 1] = color.g;
         colors[index + 2] = color.b;
@@ -286,6 +304,9 @@ export function mountLetterField(container: HTMLElement, initialText: string): L
     renderer.render(scene, camera);
   }
 
+  const onTemperature = (): void => setText(lastText);
+  document.addEventListener(TEMPERATURE_EVENT, onTemperature);
+
   setText(initialText);
   resize();
   render();
@@ -295,6 +316,7 @@ export function mountLetterField(container: HTMLElement, initialText: string): L
     dispose() {
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
+      document.removeEventListener(TEMPERATURE_EVENT, onTemperature);
       container.removeEventListener("pointermove", onPointerMove);
       container.removeEventListener("pointerleave", onPointerLeave);
       geometry.dispose();

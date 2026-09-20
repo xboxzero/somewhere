@@ -382,3 +382,176 @@ dialog code { color: var(--amber); font-family: "JetBrains Mono", monospace; fon
   .content { padding: 1.2rem 1.1rem; }
   .topbar { gap: 0.8rem; padding: 0.7rem 1rem; }
 }
+
+/* ---------- Images in pages ---------- */
+
+.content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.2rem 0;
+  border: 1px solid var(--edge);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.12);
+}
+
+/* ---------- Image upload + editor ---------- */
+
+.image-dialog {
+  border: 1px solid var(--neon);
+  background: rgba(6, 10, 20, 0.98);
+  color: var(--text);
+  padding: 1.6rem;
+  max-width: 680px;
+  width: calc(100vw - 2rem);
+  box-shadow: 0 0 46px rgba(0, 240, 255, 0.25);
+}
+
+.image-dialog h2 {
+  margin-top: 0;
+  color: var(--neon);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 1rem;
+}
+
+.image-stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  background:
+    repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 50% / 18px 18px;
+  border: 1px solid var(--edge);
+  min-height: 180px;
+  overflow: hidden;
+}
+
+.image-stage canvas {
+  max-width: 100%;
+  max-height: 46vh;
+  height: auto;
+  display: block;
+}
+
+.image-stage.is-cropping canvas { cursor: crosshair; }
+
+.crop-box {
+  position: absolute;
+  border: 1px dashed var(--hot);
+  background: rgba(255, 43, 214, 0.12);
+  pointer-events: none;
+}
+
+.image-status {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  margin: 0.7rem 0;
+  min-height: 1.2em;
+}
+
+.image-dialog input[type="text"] {
+  width: 100%;
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--edge);
+  background: rgba(3, 8, 18, 0.85);
+  color: var(--text);
+  margin-bottom: 0.9rem;
+}
+
+.image-controls, .image-presets {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+
+.image-presets button { font-size: 0.72rem; padding: 0.35rem 0.7rem; }
+
+.image-controls button.active {
+  color: var(--hot);
+  border-color: var(--hot);
+  box-shadow: 0 0 14px rgba(255, 43, 214, 0.4);
+}
+
+.image-sliders { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.slider-row input[type="range"] { width: 100%; accent-color: var(--neon); }
+
+textarea.is-dropping {
+  border-color: var(--hot);
+  box-shadow: 0 0 20px rgba(255, 43, 214, 0.35);
+}
+
+/* ---------- Colour temperature control ---------- */
+
+.temp-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--edge);
+  padding: 0.3rem 0.6rem;
+}
+
+.temp-control input[type="range"] {
+  width: 84px;
+  accent-color: var(--neon);
+  /* Track reads as the Planckian locus it samples: ember through to sky. */
+  background: linear-gradient(90deg, #ff8400, #ffa757, #fffefa, #cadaff, #bfd3ff);
+  height: 4px;
+  border-radius: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.temp-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--neon);
+  box-shadow: 0 0 8px var(--neon);
+  cursor: pointer;
+}
+
+.temp-control input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--neon);
+  cursor: pointer;
+}
+
+#temp-readout {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  min-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) { .temp-control { display: none; } }
+
+#temp-auto {
+  font-size: 0.66rem;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+#temp-auto.active {
+  color: var(--void);
+  background: var(--neon);
+  border-color: var(--neon);
+  box-shadow: 0 0 12px var(--neon);
+}

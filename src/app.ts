@@ -3,6 +3,16 @@ import DOMPurify from "dompurify";
 import { HOME_SLUG } from "./config.js";
 import { mountGraph, type GraphHandle } from "./graph.js";
 import { mountLetterField, type LetterFieldHandle } from "./letters.js";
+import { openImageDialog } from "./imageDialog.js";
+import {
+  applyTemperature,
+  autoEnabled,
+  daylightTemperature,
+  describeDaylight,
+  setAutoEnabled,
+  storeTemperature,
+  storedTemperature,
+} from "./temperature.js";
 import {
   GitHubError,
   clearToken,
@@ -249,6 +259,64 @@ async function editPage(slug: string | null): Promise<void> {
   textarea.placeholder = "# Page title\n\nWrite your page in Markdown…";
   editor.append(textarea);
 
+  /** Inserts Markdown at the caret so an image lands where the writer is typing. */
+  function insertAtCaret(markdown: string): void {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = textarea.value.slice(0, start);
+    const after = textarea.value.slice(end);
+    const padded = `${before.endsWith("\n") || before === "" ? "" : "\n\n"}${markdown}\n`;
+    textarea.value = before + padded + after;
+    const caret = before.length + padded.length;
+    textarea.setSelectionRange(caret, caret);
+    textarea.focus();
+  }
+
+  async function handleImageFile(file: File): Promise<void> {
+    const result = await openImageDialog(file);
+    if (result) insertAtCaret(result.markdown);
+  }
+
+  const imageInput = document.createElement("input");
+  imageInput.type = "file";
+  imageInput.accept = "image/*";
+  imageInput.className = "hidden";
+  imageInput.addEventListener("change", () => {
+    const file = imageInput.files?.[0];
+    if (file) void handleImageFile(file);
+    imageInput.value = "";
+  });
+
+  const imageBtn = button("Add image");
+  imageBtn.addEventListener("click", () => imageInput.click());
+  editor.append(imageInput);
+
+  textarea.addEventListener("dragover", (event) => {
+    if (event.dataTransfer?.types.includes("Files")) {
+      event.preventDefault();
+      textarea.classList.add("is-dropping");
+    }
+  });
+
+  textarea.addEventListener("dragleave", () => textarea.classList.remove("is-dropping"));
+
+  textarea.addEventListener("drop", (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    textarea.classList.remove("is-dropping");
+    if (!file?.type.startsWith("image/")) return;
+    event.preventDefault();
+    void handleImageFile(file);
+  });
+
+  textarea.addEventListener("paste", (event) => {
+    const file = Array.from(event.clipboardData?.items ?? [])
+      .find((item) => item.type.startsWith("image/"))
+      ?.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    void handleImageFile(file);
+  });
+
   const status = document.createElement("p");
   status.className = "muted";
 
@@ -256,7 +324,7 @@ async function editPage(slug: string | null): Promise<void> {
   actions.className = "editor-actions";
   const saveBtn = button("Save", "primary");
   const cancelBtn = button("Cancel");
-  actions.append(saveBtn, cancelBtn);
+  actions.append(saveBtn, imageBtn, cancelBtn);
   editor.append(actions, status);
 
   cancelBtn.addEventListener("click", () => {
@@ -371,5 +439,56 @@ newPageBtn.addEventListener("click", () => {
 
 window.addEventListener("hashchange", () => void router());
 
+const tempSlider = requireElement<HTMLInputElement>("temp-slider");
+const tempReadout = requireElement<HTMLElement>("temp-readout");
+const tempAutoBtn = requireElement<HTMLButtonElement>("temp-auto");
+
+let autoTimer = 0;
+
+function paintTemperature(kelvin: number, auto: boolean): void {
+  const palette = applyTemperature(kelvin);
+  tempSlider.value = String(palette.kelvin);
+  tempReadout.textContent = auto
+    ? `${describeDaylight(new Date().getHours() + new Date().getMinutes() / 60)} · ${palette.kelvin}K`
+    : `${palette.kelvin}K / ${palette.mirrorKelvin}K`;
+  tempAutoBtn.classList.toggle("active", auto);
+}
+
+function tickAuto(): void {
+  if (!autoEnabled()) return;
+  paintTemperature(daylightTemperature(), true);
+}
+
+function startAuto(): void {
+  setAutoEnabled(true);
+  tickAuto();
+  window.clearInterval(autoTimer);
+  // A minute is finer than the curve moves, and cheap enough to leave running.
+  autoTimer = window.setInterval(tickAuto, 60_000);
+}
+
+function stopAuto(kelvin: number): void {
+  setAutoEnabled(false);
+  window.clearInterval(autoTimer);
+  autoTimer = 0;
+  storeTemperature(kelvin);
+  paintTemperature(kelvin, false);
+}
+
+// Dragging the slider is an explicit override, so it leaves automatic mode.
+tempSlider.addEventListener("input", () => stopAuto(Number(tempSlider.value)));
+
+tempAutoBtn.addEventListener("click", () => {
+  if (autoEnabled()) stopAuto(Number(tempSlider.value));
+  else startAuto();
+});
+
+// A sleeping laptop stops timers, so re-sync whenever the tab becomes visible.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) tickAuto();
+});
+
+if (autoEnabled()) startAuto();
+else paintTemperature(storedTemperature(), false);
 updateAuthUI();
 void router();

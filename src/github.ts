@@ -1,4 +1,4 @@
-import { OWNER, REPO, BRANCH, PAGES_DIR } from "./config.js";
+import { OWNER, REPO, BRANCH, PAGES_DIR, IMAGES_DIR } from "./config.js";
 
 const API = "https://api.github.com";
 const TOKEN_KEY = "wiki_gh_token";
@@ -188,6 +188,21 @@ export async function deletePage(slug: string, sha: string): Promise<void> {
     body: JSON.stringify({
       message: `Delete page: ${slug}`,
       sha,
+      branch: BRANCH,
+    }),
+  });
+}
+
+/**
+ * Commits an image to the repository's image folder. The caller supplies base64
+ * because the encoding happens alongside the canvas work that produced it.
+ */
+export async function uploadImage(fileName: string, base64: string): Promise<void> {
+  await apiFetch(`/repos/${OWNER}/${REPO}/contents/${IMAGES_DIR}/${fileName}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      message: `Add image: ${fileName}`,
+      content: base64,
       branch: BRANCH,
     }),
   });

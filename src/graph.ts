@@ -16,6 +16,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
+import { TEMPERATURE_EVENT } from "./temperature.js";
 import { PAGES_DIR } from "./config.js";
 
 interface GraphData {
@@ -30,6 +31,16 @@ interface Node {
 
 const ACCENT = new Color("#00f0ff");
 const ACCENT_HOT = new Color("#ff2bd6");
+
+/** Reads the live theme colours so the graph tracks the colour temperature. */
+function readAccent(name: string, fallback: Color): Color {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  try {
+    return value ? new Color(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export interface GraphHandle {
   dispose(): void;
@@ -118,6 +129,9 @@ export async function mountGraph(
   );
   const byslug = new Map(nodes.map((node) => [node.slug, node]));
 
+  let accent = readAccent("--neon", ACCENT);
+  let accentHot = readAccent("--hot", ACCENT_HOT);
+
   const scene = new Scene();
   const camera = new PerspectiveCamera(55, 1, 0.1, 2000);
   camera.position.set(0, 0, 78);
@@ -144,7 +158,7 @@ export async function mountGraph(
   const edgeGeometry = new BufferGeometry();
   edgeGeometry.setAttribute("position", new Float32BufferAttribute(edgePositions, 3));
   const edgeMaterial = new LineBasicMaterial({
-    color: ACCENT,
+    color: accent,
     transparent: true,
     opacity: 0.32,
     blending: AdditiveBlending,
@@ -163,7 +177,7 @@ export async function mountGraph(
   );
   nodeGeometry.setAttribute(
     "color",
-    new Float32BufferAttribute(nodes.flatMap(() => [ACCENT.r, ACCENT.g, ACCENT.b]), 3),
+    new Float32BufferAttribute(nodes.flatMap(() => [accent.r, accent.g, accent.b]), 3),
   );
   const sprite = glowSprite();
   const nodeMaterial = new PointsMaterial({
@@ -268,6 +282,18 @@ export async function mountGraph(
   resize();
 
   const colorAttribute = nodeGeometry.getAttribute("color") as Float32BufferAttribute;
+
+  const onTemperature = (): void => {
+    accent = readAccent("--neon", ACCENT);
+    accentHot = readAccent("--hot", ACCENT_HOT);
+    edgeMaterial.color.copy(accent);
+    for (let i = 0; i < nodes.length; i += 1) {
+      const color = i === hovered ? accentHot : accent;
+      colorAttribute.setXYZ(i, color.r, color.g, color.b);
+    }
+    colorAttribute.needsUpdate = true;
+  };
+  document.addEventListener(TEMPERATURE_EVENT, onTemperature);
   const projected = new Vector3();
   let frame = 0;
 
@@ -285,7 +311,7 @@ export async function mountGraph(
     if (nextHovered !== hovered) {
       hovered = nextHovered;
       for (let i = 0; i < nodes.length; i += 1) {
-        const color = i === hovered ? ACCENT_HOT : ACCENT;
+        const color = i === hovered ? accentHot : accent;
         colorAttribute.setXYZ(i, color.r, color.g, color.b);
       }
       colorAttribute.needsUpdate = true;
@@ -318,6 +344,7 @@ export async function mountGraph(
     dispose() {
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
+      document.removeEventListener(TEMPERATURE_EVENT, onTemperature);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
