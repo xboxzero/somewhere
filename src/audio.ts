@@ -73,6 +73,7 @@ export function currentMode(): QenetName {
 
 export function setMode(next: QenetName): void {
   mode = next;
+  planPhrase();
 }
 
 export function isEnabled(): boolean {
@@ -150,10 +151,12 @@ export async function enable(): Promise<void> {
 
   await created.resume();
   startDrone();
+  startMelody();
 }
 
 export function disable(): void {
   wanted = false;
+  stopMelody();
   if (!context || !master) return;
   const ctx = context;
   master.gain.cancelScheduledValues(ctx.currentTime);
@@ -228,7 +231,7 @@ export interface NoteOptions {
   level?: number;
 }
 
-export function playNote({ degree, duration = 1.6, level = 0.5 }: NoteOptions): void {
+export function playNote({ degree, duration = 6.5, level = 0.5 }: NoteOptions): void {
   if (!wanted || !context || !master) return;
   const ctx = context;
   const now = ctx.currentTime;
@@ -268,21 +271,109 @@ export function playNote({ degree, duration = 1.6, level = 0.5 }: NoteOptions): 
   tone.connect(voice);
   voice.connect(master);
 
-  const peak = 0.5 * level;
-  voice.gain.linearRampToValueAtTime(peak, now + 0.04);
-  voice.gain.exponentialRampToValueAtTime(peak * 0.55, now + 0.35);
+  // A slow bloom and a long tail: the note swells in, holds, then decays over
+  // seconds, so successive notes overlap into a line instead of separate blips.
+  const peak = 0.42 * level;
+  voice.gain.linearRampToValueAtTime(peak, now + 0.55);
+  voice.gain.linearRampToValueAtTime(peak * 0.82, now + duration * 0.45);
   voice.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  // Opening the filter as the note blooms makes the sustain move rather than sit.
+  tone.frequency.setValueAtTime(900, now);
+  tone.frequency.linearRampToValueAtTime(2700, now + 0.9);
+  tone.frequency.linearRampToValueAtTime(1300, now + duration);
 
   const stopAt = now + duration + 0.1;
   for (const osc of oscillators) osc.stop(stopAt);
   vibrato.stop(stopAt);
 }
 
-/** Plays an ascending figure through the mode, used when a view opens. */
-export function playPhrase(root = 0, count = 4): void {
+/* ---------------------------------------------------------------------------
+ * Melody
+ *
+ * Notes are scheduled slightly ahead of the clock rather than fired from timers,
+ * because setTimeout drifts and the audio clock does not. Each phrase is given
+ * an arc: it rises, turns, and falls back toward the tonic, moving mostly by
+ * step within the mode with the occasional leap, and rests between phrases so
+ * the line breathes. Long sustains mean consecutive notes overlap, which is
+ * what makes it read as a melody rather than a sequence of separate tones.
+ * ------------------------------------------------------------------------- */
+
+const LOOKAHEAD_S = 1.2;
+const TICK_MS = 260;
+
+let melodyTimer = 0;
+let nextNoteAt = 0;
+let degreeCursor = 0;
+let stepsLeft = 0;
+let rising = true;
+
+function planPhrase(): void {
+  stepsLeft = 4 + Math.floor(Math.random() * 5);
+  rising = Math.random() > 0.35;
+}
+
+/** Chooses the next degree: usually a step, sometimes a leap, arcing overall. */
+function nextDegree(): number {
+  if (stepsLeft <= 0) planPhrase();
+  stepsLeft -= 1;
+
+  const leap = Math.random() < 0.18;
+  const size = leap ? 2 + Math.floor(Math.random() * 2) : 1;
+  const direction = rising ? 1 : -1;
+
+  // Turn the arc around at the edges of a comfortable two-octave span.
+  if (degreeCursor > 8) rising = false;
+  if (degreeCursor < 0) rising = true;
+
+  degreeCursor += size * direction;
+  return degreeCursor;
+}
+
+function scheduleAhead(): void {
+  if (!wanted || !context) return;
+  const ctx = context;
+
+  while (nextNoteAt < ctx.currentTime + LOOKAHEAD_S) {
+    if (nextNoteAt < ctx.currentTime) nextNoteAt = ctx.currentTime + 0.05;
+
+    const degree = nextDegree();
+    const long = Math.random() < 0.4;
+    const duration = long ? 7 + Math.random() * 4 : 4 + Math.random() * 2.5;
+
+    playNote({ degree, duration, level: 0.3 + Math.random() * 0.18 });
+
+    // Notes enter well before the previous one has died away, so the line
+    // overlaps into itself; a longer gap at a phrase end is the breath.
+    const gap = stepsLeft === 0 ? 2.6 + Math.random() * 2 : 1.1 + Math.random() * 1.3;
+    nextNoteAt += gap;
+  }
+}
+
+export function startMelody(): void {
+  if (melodyTimer || !context) return;
+  planPhrase();
+  nextNoteAt = context.currentTime + 0.4;
+  melodyTimer = window.setInterval(scheduleAhead, TICK_MS);
+  scheduleAhead();
+}
+
+export function stopMelody(): void {
+  window.clearInterval(melodyTimer);
+  melodyTimer = 0;
+}
+
+/**
+ * An accent the melody keeps running underneath, so interaction colours the
+ * line rather than interrupting it.
+ */
+export function playPhrase(root = 0, count = 3): void {
   if (!wanted || !context) return;
   for (let i = 0; i < count; i += 1) {
-    window.setTimeout(() => playNote({ degree: root + i, level: 0.42, duration: 1.8 }), i * 140);
+    window.setTimeout(
+      () => playNote({ degree: root + i * 2, level: 0.34, duration: 5.5 + i }),
+      i * 320,
+    );
   }
 }
 

@@ -126,7 +126,7 @@ function present(...nodes: Node[]): void {
     app.classList.remove("is-leaving");
     app.classList.add("is-entering");
     window.setTimeout(() => app.classList.remove("is-entering"), 20);
-  }, 110);
+  }, 200);
 }
 
 async function renderNav(activeSlug: string | null): Promise<void> {
