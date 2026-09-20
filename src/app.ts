@@ -1,0 +1,326 @@
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { HOME_SLUG } from "./config.js";
+import {
+  GitHubError,
+  clearToken,
+  deletePage,
+  getPageSha,
+  isLoggedIn,
+  listPages,
+  loadPage,
+  savePage,
+  setToken,
+  verifyToken,
+} from "./github.js";
+
+const app = requireElement<HTMLElement>("app");
+const pageNav = requireElement<HTMLElement>("page-nav");
+const loginBtn = requireElement<HTMLButtonElement>("login-btn");
+const logoutBtn = requireElement<HTMLButtonElement>("logout-btn");
+const newPageBtn = requireElement<HTMLButtonElement>("new-page-btn");
+const loginDialog = requireElement<HTMLDialogElement>("login-dialog");
+const loginForm = requireElement<HTMLFormElement>("login-form");
+const tokenInput = requireElement<HTMLInputElement>("token-input");
+const loginError = requireElement<HTMLElement>("login-error");
+const loginCancel = requireElement<HTMLButtonElement>("login-cancel");
+const loginSave = requireElement<HTMLButtonElement>("login-save");
+
+function requireElement<T extends HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`Missing element #${id}`);
+  return element as T;
+}
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function titleize(slug: string): string {
+  return slug.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof GitHubError && error.status === 401) {
+    return "Your token was rejected. Log out and paste a valid token.";
+  }
+  if (error instanceof GitHubError && error.status === 403) {
+    return "GitHub refused the request. Check the token has Contents: Read and write.";
+  }
+  if (error instanceof GitHubError && error.status === 409) {
+    return "This page changed on GitHub since you opened it. Reload and redo your edit.";
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+function renderMarkdown(markdown: string): string {
+  return DOMPurify.sanitize(marked.parse(markdown, { async: false }));
+}
+
+function clear(element: HTMLElement): void {
+  element.replaceChildren();
+}
+
+function updateAuthUI(): void {
+  const loggedIn = isLoggedIn();
+  loginBtn.classList.toggle("hidden", loggedIn);
+  logoutBtn.classList.toggle("hidden", !loggedIn);
+  newPageBtn.classList.toggle("hidden", !loggedIn);
+}
+
+function showMessage(message: string, kind: "error" | "muted" = "muted"): void {
+  const paragraph = document.createElement("p");
+  paragraph.className = kind;
+  paragraph.textContent = message;
+  app.replaceChildren(paragraph);
+}
+
+async function renderNav(activeSlug: string | null): Promise<void> {
+  let slugs: string[] = [];
+  try {
+    slugs = await listPages();
+  } catch (error) {
+    console.error("Could not list pages", error);
+  }
+
+  clear(pageNav);
+  for (const slug of slugs) {
+    const link = document.createElement("a");
+    link.href = `#/page/${slug}`;
+    link.textContent = titleize(slug);
+    if (slug === activeSlug) link.classList.add("active");
+    pageNav.append(link);
+  }
+}
+
+function button(label: string, className = ""): HTMLButtonElement {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.textContent = label;
+  if (className) element.className = className;
+  return element;
+}
+
+async function viewPage(slug: string): Promise<void> {
+  showMessage("Loading…");
+  void renderNav(slug);
+
+  let content: string;
+  try {
+    ({ content } = await loadPage(slug));
+  } catch (error) {
+    if (error instanceof GitHubError && error.status === 404) {
+      renderMissingPage(slug);
+      return;
+    }
+    showMessage(describeError(error), "error");
+    return;
+  }
+
+  const header = document.createElement("div");
+  header.className = "page-header";
+  header.append(document.createElement("div"));
+
+  if (isLoggedIn()) {
+    const actions = document.createElement("div");
+    actions.className = "page-actions";
+
+    const editBtn = button("Edit");
+    editBtn.addEventListener("click", () => {
+      location.hash = `#/edit/${slug}`;
+    });
+
+    const removeBtn = button("Delete", "danger");
+    removeBtn.addEventListener("click", () => void confirmDelete(slug));
+
+    actions.append(editBtn, removeBtn);
+    header.append(actions);
+  }
+
+  const article = document.createElement("div");
+  article.className = "content";
+  article.innerHTML = renderMarkdown(content);
+
+  app.replaceChildren(header, article);
+}
+
+function renderMissingPage(slug: string): void {
+  const message = document.createElement("p");
+  message.className = "muted";
+  message.textContent = `The page "${slug}" doesn't exist yet.`;
+  app.replaceChildren(message);
+
+  if (isLoggedIn()) {
+    const createBtn = button(`Create "${slug}"`, "primary");
+    createBtn.addEventListener("click", () => {
+      location.hash = `#/edit/${slug}`;
+    });
+    app.append(createBtn);
+  }
+}
+
+async function confirmDelete(slug: string): Promise<void> {
+  if (!confirm(`Delete the page "${slug}"? This commits the deletion to GitHub.`)) return;
+  try {
+    const sha = await getPageSha(slug);
+    if (!sha) {
+      showMessage(`"${slug}" no longer exists on GitHub.`, "error");
+      return;
+    }
+    await deletePage(slug, sha);
+    location.hash = "#/";
+    await router();
+  } catch (error) {
+    showMessage(describeError(error), "error");
+  }
+}
+
+async function editPage(slug: string | null): Promise<void> {
+  if (!isLoggedIn()) {
+    showMessage("Log in with a GitHub token to edit pages.", "error");
+    return;
+  }
+
+  showMessage("Loading…");
+  void renderNav(slug);
+
+  let content = "";
+  let sha: string | null = null;
+
+  if (slug) {
+    try {
+      const page = await loadPage(slug);
+      content = page.content;
+      sha = page.sha;
+    } catch (error) {
+      if (!(error instanceof GitHubError && error.status === 404)) {
+        showMessage(describeError(error), "error");
+        return;
+      }
+    }
+  }
+
+  const editor = document.createElement("div");
+  editor.className = "editor";
+
+  let slugInput: HTMLInputElement | null = null;
+  if (slug) {
+    const heading = document.createElement("h2");
+    heading.textContent = sha ? `Editing: ${titleize(slug)}` : `Creating: ${titleize(slug)}`;
+    editor.append(heading);
+  } else {
+    slugInput = document.createElement("input");
+    slugInput.type = "text";
+    slugInput.placeholder = "Page name (e.g. Project Notes)";
+    editor.append(slugInput);
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = content;
+  textarea.placeholder = "# Page title\n\nWrite your page in Markdown…";
+  editor.append(textarea);
+
+  const status = document.createElement("p");
+  status.className = "muted";
+
+  const actions = document.createElement("div");
+  actions.className = "editor-actions";
+  const saveBtn = button("Save", "primary");
+  const cancelBtn = button("Cancel");
+  actions.append(saveBtn, cancelBtn);
+  editor.append(actions, status);
+
+  cancelBtn.addEventListener("click", () => {
+    location.hash = slug ? `#/page/${slug}` : "#/";
+  });
+
+  saveBtn.addEventListener("click", () => {
+    void (async () => {
+      const targetSlug = slug ?? slugify(slugInput?.value ?? "");
+      if (!targetSlug) {
+        status.className = "error";
+        status.textContent = "Give the page a name first.";
+        return;
+      }
+
+      saveBtn.disabled = true;
+      status.className = "muted";
+      status.textContent = "Saving…";
+
+      try {
+        // A page reached via "create" may already exist; fetch its sha so we update it.
+        const currentSha = sha ?? (await getPageSha(targetSlug));
+        await savePage(targetSlug, textarea.value, currentSha);
+        location.hash = `#/page/${targetSlug}`;
+        await router();
+      } catch (error) {
+        saveBtn.disabled = false;
+        status.className = "error";
+        status.textContent = describeError(error);
+      }
+    })();
+  });
+
+  app.replaceChildren(editor);
+}
+
+async function router(): Promise<void> {
+  const segments = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  const [route, param] = segments;
+
+  if (route === "edit") return editPage(param ?? null);
+  if (route === "new") return editPage(null);
+  if (route === "page" && param) return viewPage(param);
+  return viewPage(HOME_SLUG);
+}
+
+loginBtn.addEventListener("click", () => {
+  tokenInput.value = "";
+  loginError.textContent = "";
+  loginDialog.showModal();
+});
+
+loginCancel.addEventListener("click", () => loginDialog.close());
+
+loginForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void (async () => {
+    const token = tokenInput.value.trim();
+    if (!token) return;
+
+    loginSave.disabled = true;
+    loginError.textContent = "";
+    setToken(token);
+
+    try {
+      await verifyToken();
+      loginDialog.close();
+      updateAuthUI();
+      await router();
+    } catch (error) {
+      clearToken();
+      loginError.textContent = describeError(error);
+    } finally {
+      loginSave.disabled = false;
+    }
+  })();
+});
+
+logoutBtn.addEventListener("click", () => {
+  clearToken();
+  updateAuthUI();
+  void router();
+});
+
+newPageBtn.addEventListener("click", () => {
+  location.hash = "#/new";
+});
+
+window.addEventListener("hashchange", () => void router());
+
+updateAuthUI();
+void router();

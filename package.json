@@ -1,0 +1,19 @@
+{
+  "name": "somewhere-wiki",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "dev": "node scripts/build.mjs --watch"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.3",
+    "marked": "^15.0.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.3"
+  }
+}
