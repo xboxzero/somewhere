@@ -4,6 +4,7 @@ import { HOME_SLUG } from "./config.js";
 import { mountGraph, type GraphHandle } from "./graph.js";
 import { mountLetterField, type LetterFieldHandle } from "./letters.js";
 import { openImageDialog } from "./imageDialog.js";
+import { applyTemperature, storeTemperature, storedTemperature } from "./temperature.js";
 import {
   GitHubError,
   clearToken,
@@ -430,5 +431,18 @@ newPageBtn.addEventListener("click", () => {
 
 window.addEventListener("hashchange", () => void router());
 
+const tempSlider = requireElement<HTMLInputElement>("temp-slider");
+const tempReadout = requireElement<HTMLElement>("temp-readout");
+
+function setTemperature(kelvin: number, persist: boolean): void {
+  const palette = applyTemperature(kelvin);
+  tempSlider.value = String(palette.kelvin);
+  tempReadout.textContent = `${palette.kelvin}K / ${palette.mirrorKelvin}K`;
+  if (persist) storeTemperature(palette.kelvin);
+}
+
+tempSlider.addEventListener("input", () => setTemperature(Number(tempSlider.value), true));
+
+setTemperature(storedTemperature(), false);
 updateAuthUI();
 void router();

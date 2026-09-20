@@ -492,3 +492,53 @@ textarea.is-dropping {
   border-color: var(--hot);
   box-shadow: 0 0 20px rgba(255, 43, 214, 0.35);
 }
+
+/* ---------- Colour temperature control ---------- */
+
+.temp-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--edge);
+  padding: 0.3rem 0.6rem;
+}
+
+.temp-control input[type="range"] {
+  width: 84px;
+  accent-color: var(--neon);
+  /* Track reads as the Planckian locus it samples: ember through to sky. */
+  background: linear-gradient(90deg, #ff8400, #ffa757, #fffefa, #cadaff, #bfd3ff);
+  height: 4px;
+  border-radius: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.temp-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--neon);
+  box-shadow: 0 0 8px var(--neon);
+  cursor: pointer;
+}
+
+.temp-control input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--neon);
+  cursor: pointer;
+}
+
+#temp-readout {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  min-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) { .temp-control { display: none; } }
