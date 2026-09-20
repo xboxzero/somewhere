@@ -13,10 +13,12 @@
     <a class="brand" href="#/">Xero Wiki</a>
     <nav id="page-nav" class="page-nav"></nav>
     <div class="topbar-actions">
-      <label class="temp-control" title="Colour temperature of the theme">
-        <input id="temp-slider" type="range" min="1800" max="12000" step="100" />
+      <div class="temp-control">
+        <button id="temp-auto" type="button" title="Follow the colour temperature of daylight">Auto</button>
+        <input id="temp-slider" type="range" min="1800" max="12000" step="100"
+               title="Colour temperature of the theme" />
         <span id="temp-readout">9200K</span>
-      </label>
+      </div>
       <a class="graph-link" href="#/graph">Network</a>
       <button id="new-page-btn" class="primary hidden" type="button">+ New page</button>
       <button id="login-btn" class="primary" type="button">Login</button>

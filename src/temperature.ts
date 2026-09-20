@@ -143,7 +143,74 @@ export function buildPalette(kelvin: number): Palette {
   };
 }
 
+/**
+ * Colour temperature of natural light through the day, as hour/Kelvin
+ * keyframes. Sunlight is warmest near the horizon at dawn and dusk and closest
+ * to neutral daylight at noon, while the twilight and night sky read cool, so
+ * the curve swings low twice a day rather than tracking brightness.
+ */
+const DAYLIGHT: { hour: number; kelvin: number }[] = [
+  { hour: 0, kelvin: 11000 }, // night sky
+  { hour: 4, kelvin: 9000 }, // pre-dawn blue hour
+  { hour: 5.5, kelvin: 2200 }, // sunrise
+  { hour: 7, kelvin: 3600 },
+  { hour: 9, kelvin: 5200 },
+  { hour: 12, kelvin: 6500 }, // noon, daylight neutral
+  { hour: 15, kelvin: 5600 },
+  { hour: 17, kelvin: 4200 },
+  { hour: 18.5, kelvin: 2400 }, // sunset, golden hour
+  { hour: 20, kelvin: 3000 },
+  { hour: 21.5, kelvin: 7000 }, // dusk climbing into blue hour
+  { hour: 23, kelvin: 10000 },
+  { hour: 24, kelvin: 11000 }, // wraps to midnight
+];
+
+export function describeDaylight(hour: number): string {
+  if (hour < 4) return "night";
+  if (hour < 5.5) return "blue hour";
+  if (hour < 7.5) return "sunrise";
+  if (hour < 11) return "morning";
+  if (hour < 14) return "midday";
+  if (hour < 17) return "afternoon";
+  if (hour < 19.5) return "sunset";
+  if (hour < 21.5) return "dusk";
+  return "night";
+}
+
+/**
+ * Temperature of daylight at a moment, interpolated between keyframes in mired
+ * space so the transition is perceptually even rather than bunching at the
+ * cool end the way interpolating Kelvin directly would.
+ */
+export function daylightTemperature(now = new Date()): number {
+  const hour = now.getHours() + now.getMinutes() / 60;
+
+  let previous = DAYLIGHT[0]!;
+  for (const frame of DAYLIGHT) {
+    if (frame.hour >= hour) {
+      const span = frame.hour - previous.hour;
+      const t = span === 0 ? 0 : (hour - previous.hour) / span;
+      const fromMired = 1_000_000 / previous.kelvin;
+      const toMired = 1_000_000 / frame.kelvin;
+      const mired = fromMired + (toMired - fromMired) * t;
+      return clamp(1_000_000 / mired, MIN_KELVIN, MAX_KELVIN);
+    }
+    previous = frame;
+  }
+
+  return DEFAULT_KELVIN;
+}
+
 const STORAGE_KEY = "wiki_temperature";
+const AUTO_KEY = "wiki_temperature_auto";
+
+export function autoEnabled(): boolean {
+  return localStorage.getItem(AUTO_KEY) !== "off";
+}
+
+export function setAutoEnabled(enabled: boolean): void {
+  localStorage.setItem(AUTO_KEY, enabled ? "on" : "off");
+}
 
 export function storedTemperature(): number {
   const raw = Number(localStorage.getItem(STORAGE_KEY));

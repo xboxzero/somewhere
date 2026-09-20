@@ -542,3 +542,16 @@ textarea.is-dropping {
 }
 
 @media (max-width: 760px) { .temp-control { display: none; } }
+
+#temp-auto {
+  font-size: 0.66rem;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+#temp-auto.active {
+  color: var(--void);
+  background: var(--neon);
+  border-color: var(--neon);
+  box-shadow: 0 0 12px var(--neon);
+}

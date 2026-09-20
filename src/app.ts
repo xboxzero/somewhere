@@ -4,7 +4,15 @@ import { HOME_SLUG } from "./config.js";
 import { mountGraph, type GraphHandle } from "./graph.js";
 import { mountLetterField, type LetterFieldHandle } from "./letters.js";
 import { openImageDialog } from "./imageDialog.js";
-import { applyTemperature, storeTemperature, storedTemperature } from "./temperature.js";
+import {
+  applyTemperature,
+  autoEnabled,
+  daylightTemperature,
+  describeDaylight,
+  setAutoEnabled,
+  storeTemperature,
+  storedTemperature,
+} from "./temperature.js";
 import {
   GitHubError,
   clearToken,
@@ -433,16 +441,54 @@ window.addEventListener("hashchange", () => void router());
 
 const tempSlider = requireElement<HTMLInputElement>("temp-slider");
 const tempReadout = requireElement<HTMLElement>("temp-readout");
+const tempAutoBtn = requireElement<HTMLButtonElement>("temp-auto");
 
-function setTemperature(kelvin: number, persist: boolean): void {
+let autoTimer = 0;
+
+function paintTemperature(kelvin: number, auto: boolean): void {
   const palette = applyTemperature(kelvin);
   tempSlider.value = String(palette.kelvin);
-  tempReadout.textContent = `${palette.kelvin}K / ${palette.mirrorKelvin}K`;
-  if (persist) storeTemperature(palette.kelvin);
+  tempReadout.textContent = auto
+    ? `${describeDaylight(new Date().getHours() + new Date().getMinutes() / 60)} · ${palette.kelvin}K`
+    : `${palette.kelvin}K / ${palette.mirrorKelvin}K`;
+  tempAutoBtn.classList.toggle("active", auto);
 }
 
-tempSlider.addEventListener("input", () => setTemperature(Number(tempSlider.value), true));
+function tickAuto(): void {
+  if (!autoEnabled()) return;
+  paintTemperature(daylightTemperature(), true);
+}
 
-setTemperature(storedTemperature(), false);
+function startAuto(): void {
+  setAutoEnabled(true);
+  tickAuto();
+  window.clearInterval(autoTimer);
+  // A minute is finer than the curve moves, and cheap enough to leave running.
+  autoTimer = window.setInterval(tickAuto, 60_000);
+}
+
+function stopAuto(kelvin: number): void {
+  setAutoEnabled(false);
+  window.clearInterval(autoTimer);
+  autoTimer = 0;
+  storeTemperature(kelvin);
+  paintTemperature(kelvin, false);
+}
+
+// Dragging the slider is an explicit override, so it leaves automatic mode.
+tempSlider.addEventListener("input", () => stopAuto(Number(tempSlider.value)));
+
+tempAutoBtn.addEventListener("click", () => {
+  if (autoEnabled()) stopAuto(Number(tempSlider.value));
+  else startAuto();
+});
+
+// A sleeping laptop stops timers, so re-sync whenever the tab becomes visible.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) tickAuto();
+});
+
+if (autoEnabled()) startAuto();
+else paintTemperature(storedTemperature(), false);
 updateAuthUI();
 void router();
