@@ -28,6 +28,17 @@ body {
   overflow-x: hidden;
 }
 
+/* Scrolling source code sits behind the frosted surfaces. */
+.code-rain {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
 /* Perspective grid + vignette, drawn behind everything. */
 body::before {
   content: "";
@@ -195,17 +206,26 @@ main#app {
 .page-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 
 .content {
-  background: var(--panel);
-  border: 1px solid var(--edge);
-  border-left: 2px solid var(--neon);
-  padding: 1.8rem 2rem;
-  backdrop-filter: blur(6px);
+  /* Translucent white over the code rain: the text stays legible while the
+     running code shows through the surface. */
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  padding: 2.2rem 2.4rem;
+  border-radius: 28px;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  color: #14161c;
 }
 
+/* Text on the frosted surface is dark, so it needs its own colours. */
+.content, .content p, .content li, .content td { color: #14161c; }
+.content strong { color: #000; }
+
 .content h1, .content h2, .content h3 {
-  color: var(--neon);
-  letter-spacing: 0.05em;
-  text-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+  color: color-mix(in srgb, var(--neon) 62%, #05060c);
+  letter-spacing: 0.04em;
+  text-shadow: none;
 }
 
 .content h1:first-child { margin-top: 0; }
@@ -215,50 +235,58 @@ main#app {
   padding-bottom: 0.3rem;
 }
 
-.content a { color: var(--hot); text-decoration: none; border-bottom: 1px dashed var(--edge-hot); }
-.content a:hover { text-shadow: 0 0 10px rgba(255, 43, 214, 0.7); }
+.content a {
+  color: color-mix(in srgb, var(--hot) 58%, #05060c);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--hot) 45%, transparent);
+}
+.content a:hover { border-bottom-color: currentColor; }
 
-.content strong { color: #fff; }
 
 .content code {
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  background: rgba(0, 240, 255, 0.08);
-  border: 1px solid var(--edge);
-  padding: 0.1em 0.4em;
+  background: rgba(10, 16, 28, 0.08);
+  border: 1px solid rgba(10, 16, 28, 0.14);
+  padding: 0.12em 0.5em;
+  border-radius: 999px;
   font-size: 0.88em;
-  color: var(--neon);
+  color: color-mix(in srgb, var(--neon) 55%, #05060c);
 }
 
 .content pre {
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  background: rgba(0, 12, 22, 0.85);
-  border: 1px solid var(--edge);
-  border-left: 2px solid var(--hot);
-  padding: 1rem 1.2rem;
+  background: rgba(10, 16, 28, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 1.1rem 1.3rem;
+  border-radius: 18px;
   overflow-x: auto;
+  color: #d7f5ff;
 }
 
-.content pre code { background: none; border: none; padding: 0; color: var(--text); }
+.content pre code { background: none; border: none; padding: 0; color: #d7f5ff; }
 
 .content blockquote {
-  border-left: 2px solid var(--hot);
+  border-left: 3px solid color-mix(in srgb, var(--hot) 55%, transparent);
+  border-radius: 0 18px 18px 0;
   margin: 1.2rem 0;
-  padding: 0.4rem 1.2rem;
-  color: var(--muted);
-  background: rgba(255, 43, 214, 0.04);
+  padding: 0.6rem 1.3rem;
+  color: #3d4250;
+  background: rgba(10, 16, 28, 0.05);
 }
 
 .content table { border-collapse: collapse; width: 100%; }
 
+.content table { border-radius: 18px; overflow: hidden; }
+
 .content th, .content td {
-  border: 1px solid var(--edge);
-  padding: 0.5rem 0.8rem;
+  border: 1px solid rgba(10, 16, 28, 0.12);
+  padding: 0.55rem 0.9rem;
   text-align: left;
 }
 
-.content th { color: var(--neon); text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.1em; }
+.content th { color: color-mix(in srgb, var(--neon) 60%, #05060c); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.1em; background: rgba(10,16,28,0.06); }
 
-.content hr { border: none; border-top: 1px solid var(--edge); }
+.content hr { border: none; border-top: 1px solid rgba(10, 16, 28, 0.14); }
 
 /* ---------- 3D network graph ---------- */
 
@@ -389,9 +417,10 @@ dialog code { color: var(--amber); font-family: "JetBrains Mono", monospace; fon
   max-width: 100%;
   height: auto;
   display: block;
-  margin: 1.2rem 0;
-  border: 1px solid var(--edge);
-  box-shadow: 0 0 24px rgba(0, 240, 255, 0.12);
+  margin: 1.4rem 0;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
 }
 
 /* ---------- Image upload + editor ---------- */
@@ -573,3 +602,132 @@ textarea.is-dropping {
   .editor textarea { min-height: 38vh; }
   .toolbar-hint { display: none; }
 }
+
+/* ============ Circular geometry ============
+   Controls are pills and circles rather than rectangles: radius scales with
+   the control, so a short button becomes a capsule and an icon becomes a disc. */
+
+button,
+.graph-link,
+.temp-control,
+.editor input[type="text"],
+.image-dialog input[type="text"],
+#token-input,
+.graph-label {
+  border-radius: 999px;
+}
+
+.topbar {
+  border-bottom: none;
+  margin: 0.8rem auto 0;
+  max-width: 1400px;
+  width: calc(100% - 2rem);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  padding: 0.6rem 1.4rem;
+}
+
+.editor textarea {
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #14161c;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 1.4rem 1.6rem;
+}
+
+.editor textarea::placeholder { color: #5a6072; }
+
+.editor h2, .editor .muted { color: var(--text); }
+
+.graph-stage {
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+dialog, .image-dialog {
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #14161c;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+dialog h2, .image-dialog h2 { color: color-mix(in srgb, var(--neon) 55%, #05060c); }
+dialog .muted, .image-dialog .muted { color: #4a5062; }
+dialog strong { color: #000; }
+
+#token-input,
+.image-dialog input[type="text"] {
+  background: rgba(10, 16, 28, 0.06);
+  border: 1px solid rgba(10, 16, 28, 0.16);
+  color: #14161c;
+}
+
+dialog button, .image-dialog button { color: #14161c; border-color: rgba(10,16,28,0.2); }
+dialog button.primary, .image-dialog button.primary { color: #fff; }
+
+.image-stage { border-radius: 24px; }
+.image-stage canvas { border-radius: 20px; }
+.crop-box { border-radius: 12px; }
+
+/* Round the range tracks and thumbs too */
+input[type="range"] { border-radius: 999px; }
+
+/* ============ View transitions ============ */
+
+main#app {
+  transition: opacity 0.18s ease, transform 0.22s ease, filter 0.22s ease;
+}
+
+main#app.is-leaving {
+  opacity: 0;
+  transform: translateY(10px) scale(0.995);
+  filter: blur(2px);
+}
+
+main#app.is-entering {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.995);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main#app, main#app.is-leaving, main#app.is-entering {
+    transition: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* Sound controls */
+
+#sound-toggle.active {
+  color: var(--void);
+  background: var(--neon);
+  border-color: var(--neon);
+  box-shadow: 0 0 14px var(--neon);
+}
+
+#qenet-select {
+  font: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  cursor: pointer;
+}
+
+#qenet-select option { background: #0b1018; color: #d7f5ff; }

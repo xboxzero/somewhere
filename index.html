@@ -19,12 +19,21 @@
                title="Colour temperature of the theme" />
         <span id="temp-readout">9200K</span>
       </div>
+      <button id="sound-toggle" type="button" title="Interactive sound in Ethiopian qenet modes">Sound</button>
+      <select id="qenet-select" class="hidden" title="Qenet mode">
+        <option value="tizita">Tizita</option>
+        <option value="bati">Bati</option>
+        <option value="ambassel">Ambassel</option>
+        <option value="anchihoye">Anchihoye</option>
+      </select>
       <a class="graph-link" href="#/graph">Network</a>
       <button id="new-page-btn" class="primary hidden" type="button">+ New page</button>
       <button id="login-btn" class="primary" type="button">Login</button>
       <button id="logout-btn" class="hidden" type="button">Logout</button>
     </div>
   </header>
+
+  <canvas id="code-rain" class="code-rain" aria-hidden="true"></canvas>
 
   <div id="hero" class="hero"></div>
 
