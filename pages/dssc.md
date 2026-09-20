@@ -8,3 +8,4 @@ first experiment
 19/09/2026
 
 
+[solarpunk](#/page/solarpunk)
