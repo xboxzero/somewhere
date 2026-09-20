@@ -4,6 +4,8 @@ import { HOME_SLUG } from "./config.js";
 import { mountGraph, type GraphHandle } from "./graph.js";
 import { mountLetterField, type LetterFieldHandle } from "./letters.js";
 import { openImageDialog } from "./imageDialog.js";
+import { mountCodeRain } from "./codeRain.js";
+import * as audio from "./audio.js";
 import {
   applyTemperature,
   autoEnabled,
@@ -112,6 +114,21 @@ function showMessage(message: string, kind: "error" | "muted" = "muted"): void {
   app.replaceChildren(paragraph);
 }
 
+/**
+ * Swaps view content behind a short fade. Replacing children outright makes
+ * navigation snap; letting the old view settle out first reads as movement
+ * between places rather than a redraw.
+ */
+function present(...nodes: Node[]): void {
+  app.classList.add("is-leaving");
+  window.setTimeout(() => {
+    app.replaceChildren(...nodes);
+    app.classList.remove("is-leaving");
+    app.classList.add("is-entering");
+    window.setTimeout(() => app.classList.remove("is-entering"), 20);
+  }, 110);
+}
+
 async function renderNav(activeSlug: string | null): Promise<void> {
   let slugs: string[] = [];
   try {
@@ -179,7 +196,7 @@ async function viewPage(slug: string): Promise<void> {
   article.className = "content";
   article.innerHTML = renderMarkdown(content);
 
-  app.replaceChildren(header, article);
+  present(header, article);
 }
 
 function renderMissingPage(slug: string): void {
@@ -372,7 +389,7 @@ async function editPage(slug: string | null): Promise<void> {
     })();
   });
 
-  app.replaceChildren(editor);
+  present(editor);
 }
 
 async function viewGraph(): Promise<void> {
@@ -385,7 +402,7 @@ async function viewGraph(): Promise<void> {
   const hint = document.createElement("p");
   hint.className = "muted graph-hint";
   hint.textContent = "Drag to rotate · scroll to zoom · click a node to open it";
-  app.replaceChildren(stage, hint);
+  present(stage, hint);
 
   try {
     graph = await mountGraph(stage, (slug) => {
@@ -504,5 +521,55 @@ document.addEventListener("visibilitychange", () => {
 
 if (autoEnabled()) startAuto();
 else paintTemperature(storedTemperature(), false);
+
+// --- Code rain backdrop ---
+mountCodeRain(requireElement<HTMLCanvasElement>("code-rain"));
+
+// --- Interactive sound ---
+const soundToggle = requireElement<HTMLButtonElement>("sound-toggle");
+const qenetSelect = requireElement<HTMLSelectElement>("qenet-select");
+
+function syncSoundUI(): void {
+  const on = audio.isEnabled();
+  soundToggle.classList.toggle("active", on);
+  qenetSelect.classList.toggle("hidden", !on);
+}
+
+soundToggle.addEventListener("click", () => {
+  void (async () => {
+    if (audio.isEnabled()) {
+      audio.disable();
+    } else {
+      // Opening the context must happen inside this gesture, per browser policy.
+      await audio.enable();
+      audio.playPhrase(0, 4);
+    }
+    syncSoundUI();
+  })();
+});
+
+qenetSelect.addEventListener("change", () => {
+  audio.setMode(qenetSelect.value as audio.QenetName);
+  audio.playPhrase(0, 3);
+});
+
+/** Walks the mode so repeated clicks make a melody rather than one pitch. */
+let degree = 0;
+function sound(step: number, level: number): void {
+  if (!audio.isEnabled()) return;
+  degree = (degree + step) % 10;
+  audio.playNote({ degree, level });
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest("#sound-toggle")) return;
+  if (target.closest("button, a, .graph-label")) sound(2, 0.5);
+});
+
+window.addEventListener("hashchange", () => sound(3, 0.4));
+
+syncSoundUI();
 updateAuthUI();
 void router();

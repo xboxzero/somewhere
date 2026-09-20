@@ -14,6 +14,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { TEMPERATURE_EVENT } from "./temperature.js";
+import { amplitude } from "./audio.js";
 
 /**
  * Renders text as a volumetric cloud of particles: the glyphs are rasterised to
@@ -227,6 +228,7 @@ export function mountLetterField(container: HTMLElement, initialText: string): L
 
   let frame = 0;
   let time = 0;
+  let level = 0;
 
   function render(): void {
     frame = requestAnimationFrame(render);
@@ -245,7 +247,10 @@ export function mountLetterField(container: HTMLElement, initialText: string): L
 
     const attribute = geometry.getAttribute("position") as Float32BufferAttribute | undefined;
     if (attribute) {
-      const waveScale = reduceMotion ? 0 : 1;
+      // Sound, when it is playing, drives the wave: the word swells with the
+      // music instead of only breathing on its own timer.
+      level += (amplitude() - level) * 0.12;
+      const waveScale = reduceMotion ? 0 : 1 + level * 2.6;
 
       for (let i = 0; i < count; i += 1) {
         const index = i * 3;
