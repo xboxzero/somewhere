@@ -23,3 +23,5 @@ function detectRepository(): { owner: string; repo: string } {
 }
 
 export const { owner: OWNER, repo: REPO } = detectRepository();
+
+export const IMAGES_DIR = "images";

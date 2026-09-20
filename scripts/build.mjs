@@ -1,5 +1,6 @@
 import { context, build } from "esbuild";
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 const watch = process.argv.includes("--watch");
 const outDir = "dist";
@@ -40,6 +41,13 @@ async function copyStaticAssets() {
   await cp("index.html", `${outDir}/index.html`);
   await cp("style.css", `${outDir}/style.css`);
   await cp("pages", `${outDir}/pages`, { recursive: true });
+
+  // Uploaded images arrive by commit, so the folder may not exist on a fresh clone.
+  if (existsSync("images")) {
+    await cp("images", `${outDir}/images`, { recursive: true });
+  } else {
+    await mkdir(`${outDir}/images`, { recursive: true });
+  }
 
   const entries = await readdir("pages");
   const slugs = entries

@@ -3,6 +3,7 @@ import DOMPurify from "dompurify";
 import { HOME_SLUG } from "./config.js";
 import { mountGraph, type GraphHandle } from "./graph.js";
 import { mountLetterField, type LetterFieldHandle } from "./letters.js";
+import { openImageDialog } from "./imageDialog.js";
 import {
   GitHubError,
   clearToken,
@@ -249,6 +250,64 @@ async function editPage(slug: string | null): Promise<void> {
   textarea.placeholder = "# Page title\n\nWrite your page in Markdown…";
   editor.append(textarea);
 
+  /** Inserts Markdown at the caret so an image lands where the writer is typing. */
+  function insertAtCaret(markdown: string): void {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = textarea.value.slice(0, start);
+    const after = textarea.value.slice(end);
+    const padded = `${before.endsWith("\n") || before === "" ? "" : "\n\n"}${markdown}\n`;
+    textarea.value = before + padded + after;
+    const caret = before.length + padded.length;
+    textarea.setSelectionRange(caret, caret);
+    textarea.focus();
+  }
+
+  async function handleImageFile(file: File): Promise<void> {
+    const result = await openImageDialog(file);
+    if (result) insertAtCaret(result.markdown);
+  }
+
+  const imageInput = document.createElement("input");
+  imageInput.type = "file";
+  imageInput.accept = "image/*";
+  imageInput.className = "hidden";
+  imageInput.addEventListener("change", () => {
+    const file = imageInput.files?.[0];
+    if (file) void handleImageFile(file);
+    imageInput.value = "";
+  });
+
+  const imageBtn = button("Add image");
+  imageBtn.addEventListener("click", () => imageInput.click());
+  editor.append(imageInput);
+
+  textarea.addEventListener("dragover", (event) => {
+    if (event.dataTransfer?.types.includes("Files")) {
+      event.preventDefault();
+      textarea.classList.add("is-dropping");
+    }
+  });
+
+  textarea.addEventListener("dragleave", () => textarea.classList.remove("is-dropping"));
+
+  textarea.addEventListener("drop", (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    textarea.classList.remove("is-dropping");
+    if (!file?.type.startsWith("image/")) return;
+    event.preventDefault();
+    void handleImageFile(file);
+  });
+
+  textarea.addEventListener("paste", (event) => {
+    const file = Array.from(event.clipboardData?.items ?? [])
+      .find((item) => item.type.startsWith("image/"))
+      ?.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    void handleImageFile(file);
+  });
+
   const status = document.createElement("p");
   status.className = "muted";
 
@@ -256,7 +315,7 @@ async function editPage(slug: string | null): Promise<void> {
   actions.className = "editor-actions";
   const saveBtn = button("Save", "primary");
   const cancelBtn = button("Cancel");
-  actions.append(saveBtn, cancelBtn);
+  actions.append(saveBtn, imageBtn, cancelBtn);
   editor.append(actions, status);
 
   cancelBtn.addEventListener("click", () => {
