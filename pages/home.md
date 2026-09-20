@@ -14,7 +14,7 @@ Saved edits appear on the published site once the deploy finishes, usually under
 
 In GitHub: **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
 
-- **Repository access**: only the `somewhere` repository
+- **Repository access**: only the `xero-wiki` repository
 - **Permissions**: Contents → **Read and write**
 - Set an expiration date you're comfortable with
 
