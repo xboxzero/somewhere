@@ -1,26 +1,62 @@
 # Somewhere Wiki
 
-An interactive wiki built with [Quartz](https://quartz.jzhao.xyz), deployed to GitHub Pages.
+A wiki hosted on GitHub Pages that you can log into and edit directly in the browser. Edits are committed to this repository through the GitHub API — there is no server and no database.
 
-Features out of the box: full-text search, a graph view of how pages link together, automatic backlinks, dark/light mode, tags, and folder-based navigation.
+## How it works
 
-## Adding content
+- **Pages** are Markdown files in [`pages/`](pages).
+- **Reading** is served from the static files published to GitHub Pages, so visitors hit no API rate limits.
+- **Logging in** means pasting a GitHub personal access token, which is kept in your browser's local storage and sent only to `api.github.com`.
+- **Saving** commits the file to this repo via the GitHub Contents API, which triggers the deploy workflow and republishes the site.
 
-Pages live as Markdown files under `content/`. See [`content/guides/getting-started.md`](content/guides/getting-started.md) for how to add pages, link them together, and organize sections.
+While you are logged in, pages are read through the API instead, so you always see the current version rather than waiting for the deploy to finish.
+
+## Setup
+
+### 1. Enable GitHub Pages
+
+Repo **Settings → Pages → Source: GitHub Actions**. Pushes to `master` then build and publish automatically via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
+The site is served at `https://xboxzero.github.io/somewhere`.
+
+### 2. Create a token
+
+**Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
+
+- **Repository access**: only this repository
+- **Permissions**: Contents → **Read and write**
+- Set an expiration you're comfortable with
+
+Open the site, click **Login**, and paste the token. It is validated against GitHub before being saved, and **Logout** removes it.
+
+> [!NOTE]
+> Anyone holding that token can write to this repository, so treat it like a password. Scope it to this repo only, give it an expiry, and revoke it in GitHub settings if it leaks.
 
 ## Local development
 
 ```bash
-npm ci
-npx quartz build --serve
+npm install
+npm run dev     # rebuild on change into dist/
+npm run build   # production build
+npm run typecheck
 ```
 
-This starts a live-reloading preview at `http://localhost:8080`.
+Then serve the build:
 
-## Deployment
+```bash
+cd dist && python3 -m http.server 8081
+```
 
-Pushing to `master` triggers `.github/workflows/deploy.yml`, which builds the site and publishes it to GitHub Pages.
+Editing requires the deployed site (or any origin you've allowed); reading works locally as-is.
 
-**One-time setup**: in the repo's Settings → Pages, set the source to "GitHub Actions".
+## Project layout
 
-The site will be served at `https://xboxzero.github.io/somewhere`.
+| Path | Purpose |
+| --- | --- |
+| `src/app.ts` | UI, router, and editor |
+| `src/github.ts` | Typed GitHub API client and auth |
+| `src/config.ts` | Repo, branch, and site settings |
+| `scripts/build.mjs` | esbuild bundle + static copy + page index |
+| `pages/` | Wiki content (Markdown) |
+
+To point this at a different repo or branch, edit `src/config.ts`.
