@@ -250,7 +250,9 @@ export function mountLetterField(container: HTMLElement, initialText: string): L
       // Sound, when it is playing, drives the wave: the word swells with the
       // music instead of only breathing on its own timer.
       level += (amplitude() - level) * 0.12;
-      const waveScale = reduceMotion ? 0 : 1 + level * 2.6;
+      // Enough swell to read as responding to the music, not so much that the
+      // word stops being legible while it plays.
+      const waveScale = reduceMotion ? 0 : 1 + level * 0.9;
 
       for (let i = 0; i < count; i += 1) {
         const index = i * 3;
