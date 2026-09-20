@@ -1,4 +1,4 @@
-# Somewhere Wiki
+# Xero Wiki
 
 A wiki hosted on GitHub Pages that you can log into and edit directly in the browser. Edits are committed to this repository through the GitHub API — there is no server and no database.
 
@@ -17,7 +17,7 @@ While you are logged in, pages are read through the API instead, so you always s
 
 Repo **Settings → Pages → Source: GitHub Actions**. Pushes to `master` then build and publish automatically via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
-The site is served at `https://xboxzero.github.io/somewhere`.
+The site is served at `https://xboxzero.github.io/xero-wiki`.
 
 ### 2. Create a token
 
@@ -55,8 +55,8 @@ Editing requires the deployed site (or any origin you've allowed); reading works
 | --- | --- |
 | `src/app.ts` | UI, router, and editor |
 | `src/github.ts` | Typed GitHub API client and auth |
-| `src/config.ts` | Repo, branch, and site settings |
+| `src/config.ts` | Branch and paths; owner/repo are derived from the URL |
 | `scripts/build.mjs` | esbuild bundle + static copy + page index |
 | `pages/` | Wiki content (Markdown) |
 
-To point this at a different repo or branch, edit `src/config.ts`.
+The owner and repository are read from the site's own URL, so renaming the repository on GitHub needs no code change. The fallback values in `src/config.ts` apply only when the site isn't served from `github.io`, such as a local preview.
