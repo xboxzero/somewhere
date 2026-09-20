@@ -42,3 +42,8 @@ Link to another page using its slug:
 ```
 
 Which renders as: [Home](#/page/home)
+
+## Explore
+
+Open the [Network](#/graph) view to see every page as a node in 3D. Pages link to
+[Home](#/page/home) and back again, and each link becomes an edge in that graph.

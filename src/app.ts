@@ -1,6 +1,8 @@
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { HOME_SLUG } from "./config.js";
+import { mountGraph, type GraphHandle } from "./graph.js";
+import { mountLetterField, type LetterFieldHandle } from "./letters.js";
 import {
   GitHubError,
   clearToken,
@@ -25,6 +27,27 @@ const tokenInput = requireElement<HTMLInputElement>("token-input");
 const loginError = requireElement<HTMLElement>("login-error");
 const loginCancel = requireElement<HTMLButtonElement>("login-cancel");
 const loginSave = requireElement<HTMLButtonElement>("login-save");
+const heroStage = requireElement<HTMLElement>("hero");
+
+let letterField: LetterFieldHandle | null = null;
+let graph: GraphHandle | null = null;
+
+/** WebGL can be unavailable or blocked; the wiki must still work without it. */
+function setHeroText(text: string): void {
+  try {
+    letterField ??= mountLetterField(heroStage, text);
+    letterField.setText(text);
+    heroStage.classList.remove("hidden");
+  } catch (error) {
+    console.warn("3D hero unavailable", error);
+    heroStage.classList.add("hidden");
+  }
+}
+
+function disposeGraph(): void {
+  graph?.dispose();
+  graph = null;
+}
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -107,6 +130,7 @@ function button(label: string, className = ""): HTMLButtonElement {
 
 async function viewPage(slug: string): Promise<void> {
   showMessage("Loading…");
+  setHeroText(titleize(slug));
   void renderNav(slug);
 
   let content: string;
@@ -186,6 +210,7 @@ async function editPage(slug: string | null): Promise<void> {
   }
 
   showMessage("Loading…");
+  setHeroText(slug ? titleize(slug) : "new page");
   void renderNav(slug);
 
   let content = "";
@@ -268,10 +293,34 @@ async function editPage(slug: string | null): Promise<void> {
   app.replaceChildren(editor);
 }
 
+async function viewGraph(): Promise<void> {
+  disposeGraph();
+  setHeroText("network");
+  void renderNav(null);
+
+  const stage = document.createElement("div");
+  stage.className = "graph-stage";
+  const hint = document.createElement("p");
+  hint.className = "muted graph-hint";
+  hint.textContent = "Drag to rotate · scroll to zoom · click a node to open it";
+  app.replaceChildren(stage, hint);
+
+  try {
+    graph = await mountGraph(stage, (slug) => {
+      location.hash = `#/page/${slug}`;
+    });
+  } catch (error) {
+    showMessage(describeError(error), "error");
+  }
+}
+
 async function router(): Promise<void> {
   const segments = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const [route, param] = segments;
 
+  if (route !== "graph") disposeGraph();
+
+  if (route === "graph") return viewGraph();
   if (route === "edit") return editPage(param ?? null);
   if (route === "new") return editPage(null);
   if (route === "page" && param) return viewPage(param);

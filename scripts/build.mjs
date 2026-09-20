@@ -1,5 +1,5 @@
 import { context, build } from "esbuild";
-import { cp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 
 const watch = process.argv.includes("--watch");
 const outDir = "dist";
@@ -14,6 +14,28 @@ const buildOptions = {
   outfile: `${outDir}/app.js`,
 };
 
+/** Matches wiki links of the form [label](#/page/slug). */
+const WIKI_LINK = /\]\(#\/page\/([a-z0-9-]+)\)/g;
+
+async function readGraph(slugs) {
+  const known = new Set(slugs);
+  const edges = [];
+
+  for (const slug of slugs) {
+    const markdown = await readFile(`pages/${slug}.md`, "utf8");
+    const targets = new Set();
+
+    for (const [, target] of markdown.matchAll(WIKI_LINK)) {
+      // Skip self-links and links to pages that no longer exist.
+      if (target !== slug && known.has(target)) targets.add(target);
+    }
+
+    for (const target of targets) edges.push({ from: slug, to: target });
+  }
+
+  return { nodes: slugs.map((slug) => ({ slug })), edges };
+}
+
 async function copyStaticAssets() {
   await cp("index.html", `${outDir}/index.html`);
   await cp("style.css", `${outDir}/style.css`);
@@ -25,20 +47,24 @@ async function copyStaticAssets() {
     .map((name) => name.replace(/\.md$/, ""))
     .sort();
 
+  const graph = await readGraph(slugs);
+
   await writeFile(`${outDir}/pages/index.json`, JSON.stringify(slugs, null, 2));
-  return slugs;
+  await writeFile(`${outDir}/pages/graph.json`, JSON.stringify(graph, null, 2));
+
+  return { slugs, edgeCount: graph.edges.length };
 }
 
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
 
-const slugs = await copyStaticAssets();
+const { slugs, edgeCount } = await copyStaticAssets();
 
 if (watch) {
   const ctx = await context(buildOptions);
   await ctx.watch();
-  console.log(`Watching… (${slugs.length} pages)`);
+  console.log(`Watching… (${slugs.length} pages, ${edgeCount} links)`);
 } else {
   await build(buildOptions);
-  console.log(`Built ${outDir}/ with ${slugs.length} pages`);
+  console.log(`Built ${outDir}/ with ${slugs.length} pages and ${edgeCount} links`);
 }
